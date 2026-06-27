@@ -1,0 +1,19 @@
+{
+  "name": "skylake-avx2",
+  "leaf_cost": 0.1,
+  "func_cost": 18,
+  "op_cost": {
+    "+": 1,
+    "-": 1,
+    "neg": 0.5,
+    "*": 1,
+    "/": 5,
+    "^": 9,
+    "sqrt": 4,
+    "exp": 14,
+    "log": 16,
+    "sin": 16,
+    "cos": 16,
+    "tan": 22
+  }
+}

@@ -13,8 +13,9 @@ equivalent forms and only later extracting the best one.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
+from .effects import is_effect_safe, tainted_classes
 from .egraph import EGraph
 from .rules import DEFAULT_RULES, Rule, instantiate
 
@@ -27,6 +28,7 @@ class SaturationReport:
     classes: int
     stop_reason: str
     banned: List[str] = field(default_factory=list)
+    fired: Set[str] = field(default_factory=set)
 
 
 class BackoffScheduler:
@@ -131,10 +133,13 @@ def saturate(
     max_iters: int = 30,
     node_limit: int = 5_000,
     scheduler: Optional[BackoffScheduler] = None,
+    impure: Optional[Set[str]] = None,
 ) -> SaturationReport:
     rules = rules if rules is not None else DEFAULT_RULES
     if scheduler is None:
         scheduler = BackoffScheduler()
+    impure = impure or set()
+    fired: Set[str] = set()
     saturated = False
     stop = "max-iters"
     it = 0
@@ -146,12 +151,19 @@ def saturate(
             stop = "node-limit"
             break
 
-        # 1. search each rule, letting the scheduler throttle explosive ones.
+        # Recompute which e-classes carry side effects (only if asked).
+        tainted = tainted_classes(eg, impure)
+
+        # 1. search each rule, letting the scheduler throttle explosive ones
+        #    and dropping any match that would disturb side effects.
         matches = []
         for r in rules:
             if scheduler.is_banned(r.name, it):
                 continue
             found = r.search(eg)
+            if tainted:
+                found = [m for m in found
+                         if is_effect_safe(r, m[1], eg, tainted)]
             if scheduler.record(r.name, len(found), it):
                 continue          # just banned: skip applying this round
             matches.extend((r, m) for m in found)
@@ -163,6 +175,7 @@ def saturate(
             new_id = instantiate(eg, r.rhs, subst)
             if eg.merge(new_id, eid):
                 changed = True
+                fired.add(r.name)
             if i % 500 == 0 and eg.num_nodes() > node_limit:
                 hit_limit = True
                 break
@@ -193,4 +206,5 @@ def saturate(
         classes=len(eg.classes),
         stop_reason=stop,
         banned=sorted(scheduler.ever_banned),
+        fired=fired,
     )

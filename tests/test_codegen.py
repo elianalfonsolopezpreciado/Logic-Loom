@@ -1,4 +1,4 @@
-from logic_loom import parse, to_code
+from logic_loom import parse, to_code, to_llvm
 
 
 def test_basic_operators():
@@ -30,3 +30,19 @@ def test_parentheses_preserved():
 def test_unary_minus():
     e = parse("-(a + b)")
     assert to_code(e, "c") == "-(a + b)"
+
+
+def test_llvm_signature_and_ops():
+    ir = to_llvm(parse("a*x + b"), "f")
+    assert "define double @f(double %a, double %b, double %x)" in ir
+    assert "fmul double %a, %x" in ir
+    assert "fadd double" in ir
+    assert ir.strip().endswith("}")
+
+
+def test_llvm_declares_intrinsics():
+    ir = to_llvm(parse("sqrt(x) + exp(y)"))
+    assert "declare double @llvm.sqrt.f64(double)" in ir
+    assert "declare double @llvm.exp.f64(double)" in ir
+    assert "call double @llvm.sqrt.f64(double %x)" in ir
+

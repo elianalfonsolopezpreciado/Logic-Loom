@@ -87,6 +87,12 @@ class Rule:
     name: str
     lhs: Expr
     rhs: Expr
+    # Domain preconditions under which the rewrite is sound (human readable),
+    # e.g. "x != 0".  Empty means valid for all real inputs.
+    assumes: Tuple[str, ...] = ()
+    # True if the rule changes the left-to-right order of operands, which
+    # matters when operands have side effects (see logic_loom/effects.py).
+    reorders: bool = False
 
     def search(self, eg: EGraph):
         out = []
@@ -98,16 +104,18 @@ class Rule:
         return out
 
 
-def rule(name: str, lhs: str, rhs: str) -> Rule:
-    return Rule(name, parse(lhs), parse(rhs))
+def rule(name: str, lhs: str, rhs: str, *,
+         assumes: Tuple[str, ...] = (), reorders: bool = False) -> Rule:
+    return Rule(name, parse(lhs), parse(rhs), assumes=tuple(assumes),
+                reorders=reorders)
 
 
 # The algebraic "knowledge" of the compiler.  Each line is a theorem the
 # engine is allowed to use in either the direction written.
 DEFAULT_RULES: List[Rule] = [
-    # commutativity
-    rule("comm-add", "?a + ?b", "?b + ?a"),
-    rule("comm-mul", "?a * ?b", "?b * ?a"),
+    # commutativity (reorders operands)
+    rule("comm-add", "?a + ?b", "?b + ?a", reorders=True),
+    rule("comm-mul", "?a * ?b", "?b * ?a", reorders=True),
     # associativity (both directions)
     rule("assoc-add",  "(?a + ?b) + ?c", "?a + (?b + ?c)"),
     rule("assoc-add2", "?a + (?b + ?c)", "(?a + ?b) + ?c"),
@@ -126,7 +134,7 @@ DEFAULT_RULES: List[Rule] = [
     rule("pow-0",   "?a ^ 0", "1"),
     # cancellation
     rule("sub-self", "?a - ?a", "0"),
-    rule("div-self", "?a / ?a", "1"),
+    rule("div-self", "?a / ?a", "1", assumes=("?a != 0",)),
     # combine like terms / introduce powers
     rule("self-add",  "?a + ?a", "2 * ?a"),
     rule("self-mul",  "?a * ?a", "?a ^ 2"),
@@ -152,15 +160,18 @@ EXTENDED_RULES: List[Rule] = [
     # exponentials and logarithms are inverse, and turn products into sums
     rule("exp-prod",   "exp(?a) * exp(?b)", "exp(?a + ?b)"),
     rule("exp-sum",    "exp(?a + ?b)", "exp(?a) * exp(?b)"),
-    rule("log-prod",   "log(?a * ?b)", "log(?a) + log(?b)"),
-    rule("log-sum",    "log(?a) + log(?b)", "log(?a * ?b)"),
+    rule("log-prod",   "log(?a * ?b)", "log(?a) + log(?b)",
+         assumes=("?a > 0", "?b > 0")),
+    rule("log-sum",    "log(?a) + log(?b)", "log(?a * ?b)",
+         assumes=("?a > 0", "?b > 0")),
     rule("log-exp",    "log(exp(?x))", "?x"),
-    rule("exp-log",    "exp(log(?x))", "?x"),
+    rule("exp-log",    "exp(log(?x))", "?x", assumes=("?x > 0",)),
     rule("exp-0",      "exp(0)", "1"),
     rule("log-1",      "log(1)", "0"),
     # square root
-    rule("sqrt-sq",    "sqrt(?x) * sqrt(?x)", "?x"),
-    rule("sqrt-prod",  "sqrt(?a) * sqrt(?b)", "sqrt(?a * ?b)"),
+    rule("sqrt-sq",    "sqrt(?x) * sqrt(?x)", "?x", assumes=("?x >= 0",)),
+    rule("sqrt-prod",  "sqrt(?a) * sqrt(?b)", "sqrt(?a * ?b)",
+         assumes=("?a >= 0", "?b >= 0")),
     # the Pythagorean identity, in both directions
     rule("pyth",       "sin(?x)^2 + cos(?x)^2", "1"),
     rule("sin0",       "sin(0)", "0"),

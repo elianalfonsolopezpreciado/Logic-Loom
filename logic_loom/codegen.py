@@ -84,3 +84,106 @@ def _emit(e: Expr, spec, parent_prec: int) -> str:
     # unknown function: emit verbatim
     args = ", ".join(_emit(a, spec, 0) for a in e.args)
     return f"{op}({args})"
+
+
+# --------------------------------------------------------------------- #
+# LLVM IR transpiler
+# --------------------------------------------------------------------- #
+# This lets Logic-Loom plug into a real toolchain: emit the optimized
+# expression as an LLVM IR function that clang/opt can compile, inline,
+# and vectorize alongside the rest of a C/C++/Rust program.
+_LLVM_BINOP = {"+": "fadd", "-": "fsub", "*": "fmul", "/": "fdiv"}
+_LLVM_INTRINSIC = {
+    "sin": "@llvm.sin.f64", "cos": "@llvm.cos.f64",
+    "exp": "@llvm.exp.f64", "log": "@llvm.log.f64",
+    "sqrt": "@llvm.sqrt.f64", "^": "@llvm.pow.f64",
+}
+
+
+def _llvm_const(v) -> str:
+    return f"{float(v):e}"
+
+
+def free_vars(e: Expr):
+    """Sorted list of variable names in ``e`` (the function parameters)."""
+    seen = set()
+
+    def walk(node):
+        if node.kind == "var":
+            seen.add(node.name)
+        for a in node.args:
+            walk(a)
+
+    walk(e)
+    return sorted(seen)
+
+
+def to_llvm(e: Expr, name: str = "f") -> str:
+    """Render ``e`` as an LLVM IR function ``double @name(double, ...)``."""
+    params = free_vars(e)
+    body: list[str] = []
+    counter = [0]
+    used: set[str] = set()
+
+    def fresh() -> str:
+        counter[0] += 1
+        return f"%t{counter[0]}"
+
+    def emit(node: Expr) -> str:
+        if node.kind == "num":
+            return _llvm_const(node.value)
+        if node.kind == "var":
+            return f"%{node.name}"
+        if node.kind == "patvar":
+            raise ValueError("cannot generate IR from a pattern variable")
+
+        op = node.name
+        if op == "neg":
+            x = emit(node.args[0])
+            r = fresh()
+            body.append(f"  {r} = fneg double {x}")
+            return r
+        if op in _LLVM_BINOP:
+            a = emit(node.args[0])
+            b = emit(node.args[1])
+            r = fresh()
+            body.append(f"  {r} = {_LLVM_BINOP[op]} double {a}, {b}")
+            return r
+        if op in _LLVM_INTRINSIC:
+            args = [emit(a) for a in node.args]
+            fn = _LLVM_INTRINSIC[op]
+            used.add(op)
+            r = fresh()
+            joined = ", ".join(f"double {a}" for a in args)
+            body.append(f"  {r} = call double {fn}({joined})")
+            return r
+        # external function fallback
+        args = [emit(a) for a in node.args]
+        used.add(op)
+        r = fresh()
+        joined = ", ".join(f"double {a}" for a in args)
+        body.append(f"  {r} = call double @{op}({joined})")
+        return r
+
+    ret = emit(e)
+    sig = ", ".join(f"double %{p}" for p in params)
+
+    decls = []
+    for op in sorted(used):
+        if op in _LLVM_INTRINSIC:
+            fn = _LLVM_INTRINSIC[op]
+            arity = 2 if op == "^" else 1
+            decls.append(f"declare double {fn}({', '.join(['double'] * arity)})")
+        else:
+            decls.append(f"declare double @{op}(double)")
+
+    lines = []
+    lines.extend(decls)
+    if decls:
+        lines.append("")
+    lines.append(f"define double @{name}({sig}) {{")
+    lines.append("entry:")
+    lines.extend(body)
+    lines.append(f"  ret double {ret}")
+    lines.append("}")
+    return "\n".join(lines)

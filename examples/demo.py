@@ -12,7 +12,13 @@ from pathlib import Path
 # Allow running straight from a checkout without installing.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from logic_loom import ALL_RULES, optimize, to_code  # noqa: E402
+from logic_loom import (  # noqa: E402
+    ALL_RULES,
+    CostModel,
+    optimize,
+    to_code,
+    to_llvm,
+)
 
 SHOWCASE = [
     ("The distributive law (factoring)", "a*b + a*c"),
@@ -60,11 +66,34 @@ def main() -> None:
         r = optimize(expr, rules=ALL_RULES)
         print(f"  {title:32} {r.original}  ->  {r.optimized}")
 
+    banner("Hardware-aware cost model: 'optimal' depends on the target")
+    cheap_pow = CostModel("cheap-pow", {"+": 1, "-": 1, "*": 2, "/": 4, "^": 1})
+    for label, model in [("default ", None), ("cheap-pow", cheap_pow)]:
+        r = optimize("x*x*x", model=model)
+        print(f"  {label}:  x*x*x  ->  {r.optimized}  (cost {r.optimized_cost:.1f})")
+    print("  (when powers are cheap, x*x*x is extracted as x^3)")
+
+    banner("Domain safety: assumptions are tracked and reported")
+    for expr in ["x / x", "sqrt(x) * sqrt(x)"]:
+        r = optimize(expr, rules=ALL_RULES)
+        print(f"  {expr:18} -> {r.optimized}   assumes: "
+              f"{', '.join(r.assumptions) or 'nothing'}")
+
+    banner("Side effects: impure calls are never duplicated or dropped")
+    for expr in ["rand(s) - rand(s)", "rand(s) + rand(s)"]:
+        pure = optimize(expr)
+        safe = optimize(expr, impure={"rand"})
+        print(f"  {expr:20} pure: {str(pure.optimized):14} "
+              f"impure(rand): {safe.optimized}")
+
     banner("Code generation: optimize once, emit anywhere")
     e = optimize("a*x*x + b*x + c").optimized
     print(f"  optimized: {e}")
     for lang in ("c", "rust", "js"):
         print(f"    {lang:4}: {to_code(e, lang)}")
+    print("\n  LLVM IR:")
+    for line in to_llvm(e, "horner").splitlines():
+        print(f"    {line}")
     print()
 
 
