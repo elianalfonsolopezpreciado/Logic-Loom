@@ -4,13 +4,23 @@
 
 ### A compiler that understands *mathematics*, not just instructions.
 
+[![PyPI version](https://img.shields.io/pypi/v/logic-loom.svg)](https://pypi.org/project/logic-loom/)
+[![Python versions](https://img.shields.io/pypi/pyversions/logic-loom.svg)](https://pypi.org/project/logic-loom/)
+[![License: MIT](https://img.shields.io/pypi/l/logic-loom.svg)](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/LICENSE)
+[![Tests](https://img.shields.io/badge/tests-53%20passing-brightgreen.svg)](#correctness)
+
 Most optimizers shuffle instructions. Logic-Loom reasons about algebra. It
 discovers that `a*b + a*c` **is** `a*(b + c)`, finds Horner's scheme on its
 own, cancels `a*(b+c) - a*b` down to `a*c`, optimizes for a chosen hardware
 target, tracks the domain assumptions it relies on, refuses to disturb side
 effects, and emits the result as C, Rust, JavaScript or LLVM IR.
 
+```bash
+pip install logic-loom
+```
+
 [Quick start](#quick-start) ·
+[Use cases](#use-cases) ·
 [Showcase](#showcase) ·
 [How it works](#how-it-works) ·
 [Cost models](#hardware-aware-cost-models) ·
@@ -129,6 +139,68 @@ default model.
 | `(a+b)/c + (a-b)/c` | `(a + a) / c` | combine over a denominator | 11.6 -> 5.3 |
 
 Run `python examples/demo.py` to reproduce all of these with live statistics.
+
+---
+
+## Use cases
+
+Logic-Loom is a small, dependency-free engine you can drop into any Python
+program. A few concrete things people use this kind of tool for:
+
+**Speed up a hot numeric kernel.** Factor repeated work out of an inner loop and
+evaluate polynomials with fewer multiplies (Horner), then read off the cheaper
+formula:
+
+```python
+from logic_loom import optimize
+print(optimize("a*x*x + b*x + c").optimized)   # x * (a * x + b) + c
+```
+
+**Generate code for several targets from one symbolic source.** Optimize once,
+emit C, Rust, JavaScript or LLVM IR:
+
+```python
+from logic_loom import optimize, to_code, to_llvm
+e = optimize("a*x*x + b*x + c").optimized
+to_code(e, "rust")   # 'x * (a * x + b) + c'
+to_llvm(e, "poly")   # an LLVM IR function ready for clang/opt
+```
+
+**Tune for the hardware you actually run on.** The same expression can extract
+to different code for a CPU and a GPU, because division and transcendental costs
+differ:
+
+```python
+optimize("a/b + c/b", profile="gpu")   # strongly prefers a single divide
+```
+
+**Audit numerical safety.** Before trusting a simplification, see which domain
+assumptions it relied on:
+
+```python
+r = optimize("x / x")
+r.optimized      # 1
+r.assumptions    # ['?a != 0']
+```
+
+**Optimize code with side effects safely.** Tell it which calls are impure and
+it will never duplicate, drop, or reorder them:
+
+```python
+optimize("rand(s) - rand(s)", impure={"rand"})   # stays rand(s) - rand(s)
+```
+
+**Build your own algebraic optimizer.** Add domain-specific rewrite rules and
+let equality saturation exploit them:
+
+```python
+from logic_loom import optimize, rule, DEFAULT_RULES
+half_angle = rule("dbl", "sin(2*?x)", "2*sin(?x)*cos(?x)")
+optimize("sin(2*t)", rules=DEFAULT_RULES + [half_angle])
+```
+
+**Teach and explore.** Export the e-graph to Graphviz and watch how many
+equivalent forms a single expression really has (`--dot`).
 
 ---
 
