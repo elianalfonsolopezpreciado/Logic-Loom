@@ -30,6 +30,12 @@ LEAF_COST = 0.1          # tiny, so leaves are essentially free
 DEFAULT_FUNC_COST = 5.0  # sin, cos, log, ... unknown funcs
 
 
+def _node_key(node: ENode):
+    """Stable sort key for an e-node (heads may be str or numeric)."""
+    head, args = node
+    return (0, head) if isinstance(head, str) else (1, head), args
+
+
 def node_cost(node: ENode) -> float:
     head, args = node
     if not args:
@@ -49,7 +55,9 @@ def extract(eg: EGraph, root: int) -> Tuple[Expr, float]:
             if eid not in eg.classes:
                 continue
             cid = eg.find(eid)
-            for node in eg.nodes_of(cid):
+            # Sort nodes so that cost ties break deterministically, making
+            # the extracted form reproducible regardless of hash seed.
+            for node in sorted(eg.nodes_of(cid), key=_node_key):
                 head, args = node
                 # A node is only extractable once all its children are.
                 if any(eg.find(a) not in best_cost for a in args):

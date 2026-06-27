@@ -41,12 +41,36 @@ class Result:
         )
 
 
+def build_egraph(
+    source: str,
+    *,
+    rules: Optional[List[Rule]] = None,
+    max_iters: int = 30,
+    node_limit: int = 5_000,
+):
+    """Parse and saturate ``source``; return ``(egraph, root_id, report)``.
+
+    Useful for inspecting or visualizing the space of equivalent forms
+    (see :func:`logic_loom.viz.to_dot`).
+    """
+    original = parse(source)
+    eg = EGraph()
+    root = eg.add_expr(original)
+    report = saturate(
+        eg,
+        rules if rules is not None else DEFAULT_RULES,
+        max_iters=max_iters,
+        node_limit=node_limit,
+    )
+    return eg, root, report
+
+
 def optimize(
     source: str,
     *,
     rules: Optional[List[Rule]] = None,
     max_iters: int = 30,
-    node_limit: int = 10_000,
+    node_limit: int = 5_000,
 ) -> Result:
     """Parse, saturate and extract the cheapest equivalent of ``source``."""
     original = parse(source)

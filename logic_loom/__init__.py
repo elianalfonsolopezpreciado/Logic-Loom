@@ -8,21 +8,24 @@ the cheapest one.
     >>> from logic_loom import optimize
     >>> print(optimize("a*b + a*c"))
     a * b + a * c  =>  a * (b + c)
-      cost 5.2 -> 3.2  (1.62x)
+      cost 5.4 -> 3.3  (1.64x)
 """
 
-from .compiler import Result, optimize
+from .codegen import to_code
+from .compiler import Result, build_egraph, optimize
 from .cost import expr_cost, extract
 from .egraph import EGraph
 from .expr import Expr, evaluate
 from .parser import parse
-from .rules import DEFAULT_RULES, Rule, rule
-from .saturate import SaturationReport, saturate
+from .rules import ALL_RULES, DEFAULT_RULES, EXTENDED_RULES, Rule, rule
+from .saturate import BackoffScheduler, SaturationReport, saturate
+from .viz import to_dot
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "optimize",
+    "build_egraph",
     "Result",
     "Expr",
     "evaluate",
@@ -31,9 +34,14 @@ __all__ = [
     "Rule",
     "rule",
     "DEFAULT_RULES",
+    "EXTENDED_RULES",
+    "ALL_RULES",
     "saturate",
     "SaturationReport",
+    "BackoffScheduler",
     "extract",
     "expr_cost",
+    "to_code",
+    "to_dot",
     "__version__",
 ]

@@ -141,3 +141,30 @@ DEFAULT_RULES: List[Rule] = [
     rule("split-div", "(?a + ?b) / ?c", "?a/?c + ?b/?c"),
     rule("join-div",  "?a/?c + ?b/?c", "(?a + ?b) / ?c"),
 ]
+
+
+# Optional rules for transcendental functions.  These reason about the
+# *algebra* of exp / log / sqrt / trig and are validated numerically in
+# the test-suite.  They assume the usual real domains (log and sqrt of a
+# positive argument), so they live behind an opt-in flag rather than in
+# the default set.
+EXTENDED_RULES: List[Rule] = [
+    # exponentials and logarithms are inverse, and turn products into sums
+    rule("exp-prod",   "exp(?a) * exp(?b)", "exp(?a + ?b)"),
+    rule("exp-sum",    "exp(?a + ?b)", "exp(?a) * exp(?b)"),
+    rule("log-prod",   "log(?a * ?b)", "log(?a) + log(?b)"),
+    rule("log-sum",    "log(?a) + log(?b)", "log(?a * ?b)"),
+    rule("log-exp",    "log(exp(?x))", "?x"),
+    rule("exp-log",    "exp(log(?x))", "?x"),
+    rule("exp-0",      "exp(0)", "1"),
+    rule("log-1",      "log(1)", "0"),
+    # square root
+    rule("sqrt-sq",    "sqrt(?x) * sqrt(?x)", "?x"),
+    rule("sqrt-prod",  "sqrt(?a) * sqrt(?b)", "sqrt(?a * ?b)"),
+    # the Pythagorean identity, in both directions
+    rule("pyth",       "sin(?x)^2 + cos(?x)^2", "1"),
+    rule("sin0",       "sin(0)", "0"),
+    rule("cos0",       "cos(0)", "1"),
+]
+
+ALL_RULES: List[Rule] = DEFAULT_RULES + EXTENDED_RULES

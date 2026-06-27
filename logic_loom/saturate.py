@@ -12,8 +12,8 @@ equivalent forms and only later extracting the best one.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List, Optional
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional
 
 from .egraph import EGraph
 from .rules import DEFAULT_RULES, Rule, instantiate
@@ -26,6 +26,42 @@ class SaturationReport:
     nodes: int
     classes: int
     stop_reason: str
+    banned: List[str] = field(default_factory=list)
+
+
+class BackoffScheduler:
+    """Throttle rules that fire explosively (after egg's BackoffScheduler).
+
+    Associative/commutative rules can match thousands of times in a single
+    round, drowning the useful rewrites and blowing up the graph.  When a
+    rule exceeds its match budget it is *banned* for a few iterations; its
+    budget then doubles, so a genuinely productive rule is only delayed,
+    never silenced.  This is a far smarter limit than a flat node cap: it
+    lets cheap, high-value rules keep working while reining in the ones
+    that merely reshuffle the same terms.
+    """
+
+    def __init__(self, match_limit: int = 1000, ban_length: int = 4):
+        self.match_limit = match_limit
+        self.ban_length = ban_length
+        self._banned_until: Dict[str, int] = {}
+        self._times_banned: Dict[str, int] = {}
+        self.ever_banned: set[str] = set()
+
+    def is_banned(self, name: str, iteration: int) -> bool:
+        return iteration < self._banned_until.get(name, 0)
+
+    def threshold(self, name: str) -> int:
+        return self.match_limit << self._times_banned.get(name, 0)
+
+    def record(self, name: str, n_matches: int, iteration: int) -> bool:
+        """Note how often a rule matched. Returns True if it just got banned."""
+        if n_matches > self.threshold(name):
+            self._times_banned[name] = self._times_banned.get(name, 0) + 1
+            self._banned_until[name] = iteration + self.ban_length
+            self.ever_banned.add(name)
+            return True
+        return False
 
 
 # arithmetic that constant folding knows how to perform
@@ -94,23 +130,33 @@ def saturate(
     *,
     max_iters: int = 30,
     node_limit: int = 5_000,
+    scheduler: Optional[BackoffScheduler] = None,
 ) -> SaturationReport:
     rules = rules if rules is not None else DEFAULT_RULES
+    if scheduler is None:
+        scheduler = BackoffScheduler()
     saturated = False
     stop = "max-iters"
     it = 0
     for it in range(1, max_iters + 1):
         # Stop before an expensive search if we are already at the cap.
-        # Associativity + commutativity make the search space grow without
-        # bound, so a resource limit is what guarantees termination.
+        # The scheduler curbs most growth, but a hard node cap is the final
+        # guarantee of termination.
         if eg.num_nodes() > node_limit:
             stop = "node-limit"
             break
 
-        # 1. search: collect all matches before touching the graph.
-        matches = [(r, m) for r in rules for m in r.search(eg)]
+        # 1. search each rule, letting the scheduler throttle explosive ones.
+        matches = []
+        for r in rules:
+            if scheduler.is_banned(r.name, it):
+                continue
+            found = r.search(eg)
+            if scheduler.record(r.name, len(found), it):
+                continue          # just banned: skip applying this round
+            matches.extend((r, m) for m in found)
 
-        # 2. apply every match, guarding the graph size as we grow it.
+        # 2. apply every surviving match, guarding the graph size.
         changed = False
         hit_limit = False
         for i, (r, (eid, subst)) in enumerate(matches):
@@ -129,6 +175,10 @@ def saturate(
             stop = "node-limit"
             break
         if not changed and not folded:
+            # Nothing learned this round.  If rules are only idle because
+            # they are temporarily banned, keep going; otherwise we are done.
+            if any(scheduler.is_banned(r.name, it) for r in rules):
+                continue
             saturated = True
             stop = "saturated"
             break
@@ -142,4 +192,5 @@ def saturate(
         nodes=eg.num_nodes(),
         classes=len(eg.classes),
         stop_reason=stop,
+        banned=sorted(scheduler.ever_banned),
     )

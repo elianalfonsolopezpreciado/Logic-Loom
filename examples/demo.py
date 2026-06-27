@@ -12,7 +12,7 @@ from pathlib import Path
 # Allow running straight from a checkout without installing.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from logic_loom import optimize  # noqa: E402
+from logic_loom import ALL_RULES, optimize, to_code  # noqa: E402
 
 SHOWCASE = [
     ("The distributive law (factoring)", "a*b + a*c"),
@@ -24,6 +24,15 @@ SHOWCASE = [
     ("Self-inverse vanishes",             "x + 0 - x + 5"),
     ("Division cancels to one",           "x/x + y - y"),
     ("Combine over a denominator",        "(a+b)/c + (a-b)/c"),
+]
+
+# Transcendental rules (opt-in): exp / log / sqrt / trig identities.
+EXTENDED_SHOWCASE = [
+    ("Logs turn products into sums",   "log(a*b)"),
+    ("exp and log are inverse",        "log(exp(x))"),
+    ("Two exponentials become one",    "exp(a) * exp(b)"),
+    ("Pythagorean identity",           "sin(x)^2 + cos(x)^2"),
+    ("Square root squared",            "sqrt(x) * sqrt(x)"),
 ]
 
 
@@ -45,6 +54,17 @@ def main() -> None:
               f"  ({r.speedup:.2f}x cheaper)")
         print(f"  graph: {r.report.nodes} e-nodes explored "
               f"in {r.report.iterations} rounds ({r.report.stop_reason})")
+
+    banner("Extended domain: transcendental functions (--extended)")
+    for title, expr in EXTENDED_SHOWCASE:
+        r = optimize(expr, rules=ALL_RULES)
+        print(f"  {title:32} {r.original}  ->  {r.optimized}")
+
+    banner("Code generation: optimize once, emit anywhere")
+    e = optimize("a*x*x + b*x + c").optimized
+    print(f"  optimized: {e}")
+    for lang in ("c", "rust", "js"):
+        print(f"    {lang:4}: {to_code(e, lang)}")
     print()
 
 
