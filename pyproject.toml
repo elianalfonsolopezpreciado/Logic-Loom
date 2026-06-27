@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "logic-loom"
+version = "0.1.0"
+description = "A compiler that understands mathematics: it optimizes expressions by reasoning about algebra, using equality saturation over an e-graph."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Elian Alfonso Lopez Preciado" }]
+keywords = [
+    "compiler", "optimization", "algebra", "e-graph",
+    "equality-saturation", "symbolic", "rewriting",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Software Development :: Compilers",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+logic-loom = "logic_loom.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/elianalfonsolopezpreciado/Logic-Loom"
+Repository = "https://github.com/elianalfonsolopezpreciado/Logic-Loom"
+
+[tool.setuptools]
+packages = ["logic_loom"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
