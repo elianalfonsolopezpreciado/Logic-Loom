@@ -33,6 +33,8 @@ logic-loom = "logic_loom.cli:main"
 [project.urls]
 Homepage = "https://github.com/elianalfonsolopezpreciado/Logic-Loom"
 Repository = "https://github.com/elianalfonsolopezpreciado/Logic-Loom"
+Documentation = "https://github.com/elianalfonsolopezpreciado/Logic-Loom#readme"
+Issues = "https://github.com/elianalfonsolopezpreciado/Logic-Loom/issues"
 
 [tool.setuptools]
 packages = ["logic_loom"]

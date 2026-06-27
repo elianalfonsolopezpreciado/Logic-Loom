@@ -62,15 +62,18 @@ and cancels terms that destroy each other; none of it was special-cased.
 No dependencies. Pure Python (3.9+).
 
 ```bash
-git clone https://github.com/elianalfonsolopezpreciado/Logic-Loom.git
-cd Logic-Loom
+pip install logic-loom
+```
 
-# run the full showcase
-python examples/demo.py
+Then use it from the command line:
 
-# optimize from the command line
-python -m logic_loom "a*b + a*c"
+```bash
+# optimize an expression
+logic-loom "a*b + a*c"
 #  a * b + a * c  =>  a * (b + c)
+
+# the module form works too
+python -m logic_loom "a*b + a*c"
 
 # optimize for a hardware target and emit LLVM IR
 python -m logic_loom --profile gpu --target llvm "a/b + c/b"
@@ -96,11 +99,13 @@ print(r.speedup)               # 1.32
 print(to_code(r.optimized, "c"))
 ```
 
-Install it as a package (optional):
+Or run from a source checkout (and try the full showcase):
 
 ```bash
+git clone https://github.com/elianalfonsolopezpreciado/Logic-Loom.git
+cd Logic-Loom
 pip install -e .
-logic-loom "p*q + p*r + p*s"
+python examples/demo.py
 ```
 
 ---
@@ -169,7 +174,7 @@ independent of the order rules fire in. The engine runs until the laws teach it
 nothing new (the graph is **saturated**) or a resource limit is reached.
 
 **3. Extraction.** The saturated graph now contains all discovered forms. A
-[cost model](logic_loom/cost.py) assigns each operator a weight, and a
+[cost model](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/logic_loom/cost.py) assigns each operator a weight, and a
 fixed-point picks the cheapest representative of each e-class. Extraction is
 deterministic: the same input yields the same output regardless of hash seed.
 
@@ -374,18 +379,18 @@ A compact, readable codebase.
 
 | File | Responsibility |
 |---|---|
-| [`logic_loom/expr.py`](logic_loom/expr.py) | expression AST, pretty-printer, numeric evaluator |
-| [`logic_loom/parser.py`](logic_loom/parser.py) | Pratt parser (precedence, unary minus, calls, `?patvars`) |
-| [`logic_loom/egraph.py`](logic_loom/egraph.py) | the e-graph: union-find, hashcons, congruence `rebuild` |
-| [`logic_loom/rules.py`](logic_loom/rules.py) | rewrite rules (default + extended), assumptions, e-matching |
-| [`logic_loom/analysis.py`](logic_loom/analysis.py) | static rule pruning and automatic limit sizing |
-| [`logic_loom/saturate.py`](logic_loom/saturate.py) | saturation loop, constant folding, backoff scheduler |
-| [`logic_loom/effects.py`](logic_loom/effects.py) | side-effect taint analysis and rewrite safety |
-| [`logic_loom/cost.py`](logic_loom/cost.py) | cost models, hardware profiles, cheapest-term extraction |
-| [`logic_loom/codegen.py`](logic_loom/codegen.py) | emit C / Rust / JavaScript / LLVM IR |
-| [`logic_loom/viz.py`](logic_loom/viz.py) | Graphviz DOT export of the e-graph |
-| [`logic_loom/compiler.py`](logic_loom/compiler.py) | the high-level `optimize()` API |
-| [`logic_loom/cli.py`](logic_loom/cli.py) | the `python -m logic_loom` command line |
+| [`logic_loom/expr.py`](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/logic_loom/expr.py) | expression AST, pretty-printer, numeric evaluator |
+| [`logic_loom/parser.py`](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/logic_loom/parser.py) | Pratt parser (precedence, unary minus, calls, `?patvars`) |
+| [`logic_loom/egraph.py`](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/logic_loom/egraph.py) | the e-graph: union-find, hashcons, congruence `rebuild` |
+| [`logic_loom/rules.py`](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/logic_loom/rules.py) | rewrite rules (default + extended), assumptions, e-matching |
+| [`logic_loom/analysis.py`](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/logic_loom/analysis.py) | static rule pruning and automatic limit sizing |
+| [`logic_loom/saturate.py`](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/logic_loom/saturate.py) | saturation loop, constant folding, backoff scheduler |
+| [`logic_loom/effects.py`](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/logic_loom/effects.py) | side-effect taint analysis and rewrite safety |
+| [`logic_loom/cost.py`](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/logic_loom/cost.py) | cost models, hardware profiles, cheapest-term extraction |
+| [`logic_loom/codegen.py`](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/logic_loom/codegen.py) | emit C / Rust / JavaScript / LLVM IR |
+| [`logic_loom/viz.py`](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/logic_loom/viz.py) | Graphviz DOT export of the e-graph |
+| [`logic_loom/compiler.py`](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/logic_loom/compiler.py) | the high-level `optimize()` API |
+| [`logic_loom/cli.py`](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/logic_loom/cli.py) | the `python -m logic_loom` command line |
 
 ---
 
@@ -470,6 +475,6 @@ Directions for turning the demonstrator into something broader. Items marked
 <div align="center">
 
 Built as an exploration of what a compiler looks like when it thinks like a
-mathematician. MIT licensed; see [LICENSE](LICENSE).
+mathematician. MIT licensed; see [LICENSE](https://github.com/elianalfonsolopezpreciado/Logic-Loom/blob/main/LICENSE).
 
 </div>
